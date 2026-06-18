@@ -1,0 +1,16 @@
+[
+  {
+    "modid": "superfurnacemod",
+    "name": "Super Furnace Mod",
+    "description": "Adds a Super Furnace that smelts 3x faster than a regular furnace.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "updateUrl": "",
+    "authorList": ["example"],
+    "credits": "",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
