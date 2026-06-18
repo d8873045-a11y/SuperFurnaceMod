@@ -35,7 +35,8 @@ jobs:
                 classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
             }
         }
-        apply plugin: 'net.minecraftforge.gradle'
+        // ВОТ ТУТ БЫЛА ОШИБКА: Добавлено .forge в конец
+        apply plugin: 'net.minecraftforge.gradle.forge'
 
         version = "1.0.0"
         group = "com.d8873045a11y.superfurnacemod"
