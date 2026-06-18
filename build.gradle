@@ -1,17 +1,14 @@
 buildscript {
     repositories {
-        jcenter()
-        maven {
-            name = "forge"
-            url = "https://files.minecraftforge.net/maven"
-        }
+        maven { url = 'https://maven.minecraftforge.net' }
+        mavenCentral()
     }
     dependencies {
-        classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
     }
 }
 
-apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'net.minecraftforge.gradle'
 
 version = "1.0.0"
 group = "com.example.superfurnacemod"
@@ -22,10 +19,20 @@ compileJava {
     sourceCompatibility = targetCompatibility = '1.8'
 }
 
+ext.mcVersion = '1.12.2'
+ext.forgeVersion = '14.23.5.2860'
+
 minecraft {
-    version = "1.12.2-14.23.5.2860"
-    runDir = "run"
-    mappings = "stable_39"
+    mappings channel: 'stable', version: '39-1.12'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+        }
+        server {
+            workingDirectory project.file('run')
+        }
+    }
 }
 
 repositories {
@@ -33,16 +40,16 @@ repositories {
 }
 
 dependencies {
-    // No extra dependencies needed for vanilla Forge mod
+    minecraft "net.minecraftforge:forge:${mcVersion}-${forgeVersion}"
 }
 
 processResources {
     inputs.property "version", project.version
-    inputs.property "mcversion", project.minecraft.version
+    inputs.property "mcversion", mcVersion
 
     from(sourceSets.main.resources.srcDirs) {
         include 'mcmod.info'
-        expand 'version': project.version, 'mcversion': project.minecraft.version
+        expand 'version': project.version, 'mcversion': mcVersion
     }
 
     from(sourceSets.main.resources.srcDirs) {
