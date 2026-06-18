@@ -17,6 +17,12 @@ jobs:
         java-version: '8'
         distribution: 'temurin'
 
+    - name: Install Legacy Gradle 3.5
+      run: |
+        wget -q https://services.gradle.org/distributions/gradle-3.5-bin.zip
+        unzip -q gradle-3.5-bin.zip
+        echo "$GITHUB_WORKSPACE/gradle-3.5/bin" >> $GITHUB_PATH
+
     - name: Overwrite build.gradle with fixed version
       run: |
         cat << 'EOF' > build.gradle
@@ -69,14 +75,6 @@ jobs:
             }
         }
         EOF
-
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: 4.4.1
-
-    - name: Setup Minecraft Workspace
-      run: gradle setupDecompWorkspace
 
     - name: Build Mod
       run: gradle build
