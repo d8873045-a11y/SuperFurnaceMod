@@ -4,59 +4,65 @@ import com.example.superfurnacemod.container.ContainerSuperFurnace;
 import com.example.superfurnacemod.tileentity.TileEntitySuperFurnace;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 /**
- * Client-side GUI for the Super Furnace.
- * Re-uses the vanilla furnace texture (no custom texture needed).
+ * Client-side GUI — reuses the vanilla furnace texture (no custom artwork needed).
  */
 @SideOnly(Side.CLIENT)
 public class GuiSuperFurnace extends GuiContainer {
 
-    // Use the vanilla furnace GUI texture
-    private static final ResourceLocation FURNACE_GUI_TEXTURE =
-            new ResourceLocation("textures/gui/container/furnace.png");
+    private static final ResourceLocation FURNACE_TEXTURE =
+        new ResourceLocation("minecraft", "textures/gui/container/furnace.png");
 
-    private final TileEntitySuperFurnace tileEntity;
     private final ContainerSuperFurnace container;
+    private final TileEntitySuperFurnace tileEntity;
 
-    public GuiSuperFurnace(InventoryPlayer playerInventory, TileEntitySuperFurnace tileEntity) {
-        super(new ContainerSuperFurnace(playerInventory, tileEntity));
-        this.tileEntity = tileEntity;
-        this.container  = (ContainerSuperFurnace) this.inventorySlots;
-        this.xSize = 176;
-        this.ySize = 166;
+    public GuiSuperFurnace(InventoryPlayer playerInv, TileEntitySuperFurnace te) {
+        super(new ContainerSuperFurnace(playerInv, te));
+        this.tileEntity = te;
+        this.container  = (ContainerSuperFurnace) inventorySlots;
+        xSize = 176;
+        ySize = 166;
     }
 
     @Override
-    protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
+    protected void drawGuiContainerForegroundLayer(int mx, int my) {
         String title = tileEntity.hasCustomName()
-                ? tileEntity.getName()
-                : net.minecraft.client.resources.I18n.format(tileEntity.getName());
-        this.fontRenderer.drawString(title, this.xSize / 2 - this.fontRenderer.getStringWidth(title) / 2, 6, 0x404040);
-        this.fontRenderer.drawString(
-                net.minecraft.client.resources.I18n.format("container.inventory"), 8, this.ySize - 96 + 2, 0x404040);
+            ? tileEntity.getName()
+            : I18n.format(tileEntity.getName());
+        fontRenderer.drawString(
+            title,
+            xSize / 2 - fontRenderer.getStringWidth(title) / 2,
+            6, 0x404040
+        );
+        fontRenderer.drawString(
+            I18n.format("container.inventory"),
+            8, ySize - 96 + 2, 0x404040
+        );
     }
 
     @Override
-    protected void drawGuiContainerBackgroundLayer(float partialTicks, int mouseX, int mouseY) {
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        this.mc.getTextureManager().bindTexture(FURNACE_GUI_TEXTURE);
-        int x = (this.width  - this.xSize) / 2;
-        int y = (this.height - this.ySize) / 2;
-        this.drawTexturedModalRect(x, y, 0, 0, this.xSize, this.ySize);
+    protected void drawGuiContainerBackgroundLayer(float partial, int mx, int my) {
+        GlStateManager.color(1f, 1f, 1f, 1f);
+        mc.getTextureManager().bindTexture(FURNACE_TEXTURE);
 
-        // Flame (burn indicator) — located at gui x=56, y=36 offset (14×14 pixels)
+        int x = (width  - xSize) / 2;
+        int y = (height - ySize) / 2;
+        drawTexturedModalRect(x, y, 0, 0, xSize, ySize);
+
+        // Flame (fuel level)
         if (container.isBurning()) {
             int flame = container.getBurnLeftScaled(13);
-            this.drawTexturedModalRect(x + 56, y + 36 + 12 - flame, 176, 12 - flame, 14, flame + 1);
+            drawTexturedModalRect(x + 56, y + 36 + 12 - flame, 176, 12 - flame, 14, flame + 1);
         }
 
-        // Cook progress arrow — located at gui x=79, y=34 offset (24×16 pixels)
+        // Cook-progress arrow
         int progress = container.getCookProgressScaled(24);
-        this.drawTexturedModalRect(x + 79, y + 34, 176, 14, progress + 1, 16);
+        drawTexturedModalRect(x + 79, y + 34, 176, 14, progress + 1, 16);
     }
 }

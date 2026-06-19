@@ -6,12 +6,8 @@
     "CCC"
   ],
   "key": {
-    "C": {
-      "item": "minecraft:cobblestone"
-    },
-    "D": {
-      "item": "minecraft:diamond"
-    }
+    "C": { "item": "minecraft:cobblestone" },
+    "D": { "item": "minecraft:diamond" }
   },
   "result": {
     "item": "superfurnacemod:super_furnace",

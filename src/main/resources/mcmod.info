@@ -2,11 +2,10 @@
   {
     "modid": "superfurnacemod",
     "name": "Super Furnace Mod",
-    "description": "Adds a Super Furnace that smelts 3x faster than a regular furnace.",
+    "description": "Adds a Super Furnace that smelts items 3x faster than a regular furnace. Craft with 8 Cobblestone + 1 Diamond.",
     "version": "${version}",
     "mcversion": "${mcversion}",
-    "url": "",
-    "updateUrl": "",
+    "url": "https://github.com/d8873045-a11y/SuperFurnaceMod",
     "authorList": ["example"],
     "credits": "",
     "logoFile": "",

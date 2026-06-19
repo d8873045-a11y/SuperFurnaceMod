@@ -9,16 +9,21 @@ import net.minecraft.item.ItemBlock;
 import net.minecraftforge.fml.common.registry.ForgeRegistries;
 import net.minecraftforge.fml.common.registry.GameRegistry;
 
-public class ModBlocks {
+public final class ModBlocks {
 
     public static BlockSuperFurnace SUPER_FURNACE;
+    public static BlockSuperFurnace SUPER_FURNACE_LIT;
 
-    public static void registerBlocks() {
-        SUPER_FURNACE = registerBlock(new BlockSuperFurnace(false), "super_furnace");
+    private ModBlocks() {}
 
-        // Register the "on" (active) variant — not obtainable in inventory,
-        // placed automatically by TileEntity when smelting
-        registerBlock(new BlockSuperFurnace(true), "super_furnace_active");
+    public static void register() {
+        // Inactive (placeable) variant
+        SUPER_FURNACE = registerBlock(
+            new BlockSuperFurnace(false), "super_furnace", true);
+
+        // Active (lit) variant — not in creative tab, no ItemBlock
+        SUPER_FURNACE_LIT = registerBlock(
+            new BlockSuperFurnace(true), "super_furnace_lit", false);
 
         // Register TileEntity
         GameRegistry.registerTileEntity(
@@ -27,16 +32,17 @@ public class ModBlocks {
         );
     }
 
-    private static <T extends Block> T registerBlock(T block, String name) {
+    private static BlockSuperFurnace registerBlock(
+            BlockSuperFurnace block, String name, boolean withItemBlock) {
+
         block.setRegistryName(SuperFurnaceMod.MODID, name);
         block.setUnlocalizedName(SuperFurnaceMod.MODID + "." + name);
         ForgeRegistries.BLOCKS.register(block);
 
-        // Register ItemBlock only for the "off" version
-        if (!name.endsWith("_active")) {
-            ItemBlock itemBlock = new ItemBlock(block);
-            itemBlock.setRegistryName(SuperFurnaceMod.MODID, name);
-            ForgeRegistries.ITEMS.register(itemBlock);
+        if (withItemBlock) {
+            Item item = new ItemBlock(block);
+            item.setRegistryName(SuperFurnaceMod.MODID, name);
+            ForgeRegistries.ITEMS.register(item);
         }
 
         return block;

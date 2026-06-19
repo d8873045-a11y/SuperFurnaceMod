@@ -1,38 +1,38 @@
 buildscript {
     repositories {
-        maven { url = 'https://maven.minecraftforge.net' }
-        mavenCentral()
+        jcenter()
+        maven {
+            name = "forge"
+            url = "https://maven.minecraftforge.net/"
+        }
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+        classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
     }
 }
 
-apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'java'
 
-version = "1.0.0"
-group = "com.example.superfurnacemod"
+version    = "1.0.0"
+group      = "com.example.superfurnacemod"
 archivesBaseName = "superfurnacemod"
 
-sourceCompatibility = targetCompatibility = '1.8'
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
 compileJava {
-    sourceCompatibility = targetCompatibility = '1.8'
+    sourceCompatibility = '1.8'
+    targetCompatibility = '1.8'
+    options.encoding = 'UTF-8'
 }
 
-ext.mcVersion = '1.12.2'
-ext.forgeVersion = '14.23.5.2860'
-
 minecraft {
-    mappings channel: 'stable', version: '39-1.12'
-
-    runs {
-        client {
-            workingDirectory project.file('run')
-        }
-        server {
-            workingDirectory project.file('run')
-        }
-    }
+    version = "1.12.2-14.23.5.2860"
+    runDir  = "run"
+    // stable_39 mappings for 1.12.2
+    mappings = "stable_39"
+    makeObfSourceJar = false
 }
 
 repositories {
@@ -40,16 +40,18 @@ repositories {
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${mcVersion}-${forgeVersion}"
+    // All Forge/MC deps come from the 'minecraft' block above
 }
 
 processResources {
-    inputs.property "version", project.version
-    inputs.property "mcversion", mcVersion
+    // Substitute ${version} and ${mcversion} in mcmod.info
+    inputs.property "version",   project.version
+    inputs.property "mcversion", project.minecraft.version
 
     from(sourceSets.main.resources.srcDirs) {
         include 'mcmod.info'
-        expand 'version': project.version, 'mcversion': mcVersion
+        expand 'version': project.version,
+               'mcversion': project.minecraft.version
     }
 
     from(sourceSets.main.resources.srcDirs) {
@@ -59,14 +61,14 @@ processResources {
 
 jar {
     manifest {
-        attributes([
-            "Specification-Title"     : "superfurnacemod",
+        attributes(
+            "Specification-Title"     : "SuperFurnaceMod",
             "Specification-Vendor"    : "example",
             "Specification-Version"   : "1",
             "Implementation-Title"    : project.name,
-            "Implementation-Version"  : "${version}",
+            "Implementation-Version"  : project.version,
             "Implementation-Vendor"   : "example",
             "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
-        ])
+        )
     }
 }

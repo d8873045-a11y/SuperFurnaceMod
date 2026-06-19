@@ -1,27 +1,22 @@
 package com.example.superfurnacemod.tileentity;
 
-import com.example.superfurnacemod.SuperFurnaceMod;
 import com.example.superfurnacemod.block.BlockSuperFurnace;
-import net.minecraft.block.BlockFurnace;
-import net.minecraft.block.material.Material;
-import net.minecraft.block.state.IBlockState;
+import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.ContainerFurnace;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.ItemStackHelper;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.FurnaceRecipes;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.tileentity.TileEntityFurnace;
 import net.minecraft.tileentity.TileEntityLockable;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ITickable;
 import net.minecraft.util.NonNullList;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
@@ -34,72 +29,57 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * TileEntity for Super Furnace.
- * Smelts items 3x faster than a vanilla furnace (cook time divided by 3).
- * Vanilla furnace: 200 ticks per item. Super Furnace: ~67 ticks per item.
+ * TileEntity for the Super Furnace.
+ *
+ * Smelts items 3× faster than a vanilla furnace:
+ *   Vanilla = 200 ticks/item → Super = 66 ticks/item  (200 / 3 ≈ 66)
  */
 public class TileEntitySuperFurnace extends TileEntityLockable implements ITickable {
 
-    // Vanilla furnace cook time is 200 ticks. We divide by 3 → ~67 ticks.
-    private static final int VANILLA_COOK_TIME = 200;
-    public static final int SUPER_COOK_TIME = VANILLA_COOK_TIME / 3; // 66 ticks
-
-    // Slot indices
+    // Slot indices (match vanilla furnace layout)
     public static final int SLOT_INPUT  = 0;
     public static final int SLOT_FUEL   = 1;
     public static final int SLOT_OUTPUT = 2;
-    public static final int SLOT_COUNT  = 3;
 
-    private NonNullList<ItemStack> inventory = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
+    /** Ticks needed to smelt one item (vanilla = 200, ours = 200/3 ≈ 66). */
+    public static final int COOK_TIME = 66;
 
-    private int furnaceBurnTime;      // ticks remaining on current fuel
-    private int currentItemBurnTime;  // total burn time of current fuel item
-    private int cookTime;             // ticks spent cooking current item
-    private int totalCookTime;        // total ticks needed to cook current item
+    private NonNullList<ItemStack> inventory =
+        NonNullList.withSize(3, ItemStack.EMPTY);
+
+    private int burnTime;           // ticks of fuel remaining
+    private int currentItemBurnTime;// total burn time of the current fuel item
+    private int cookTime;           // ticks spent cooking the current item
+    private int totalCookTime;      // ticks needed for current item (always COOK_TIME)
 
     private String customName;
 
-    private IItemHandler itemHandler;
+    @Nullable private IItemHandler itemHandler;
 
-    // -------------------------------------------------------------------------
-    // Name / unlock helpers
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Name
+    // =========================================================================
 
-    public void setCustomInventoryName(String name) {
-        this.customName = name;
-    }
+    public void setCustomName(String name) { this.customName = name; }
 
-    @Override
-    public String getName() {
+    @Override public String getName() {
         return hasCustomName() ? customName : "container.superfurnacemod.super_furnace";
     }
 
-    @Override
-    public boolean hasCustomName() {
+    @Override public boolean hasCustomName() {
         return customName != null && !customName.isEmpty();
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // IInventory
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
-    @Override
-    public int getSizeInventory() {
-        return inventory.size();
-    }
-
-    @Override
-    public boolean isEmpty() {
-        for (ItemStack stack : inventory) {
-            if (!stack.isEmpty()) return false;
-        }
+    @Override public int  getSizeInventory()          { return inventory.size(); }
+    @Override public boolean isEmpty() {
+        for (ItemStack s : inventory) if (!s.isEmpty()) return false;
         return true;
     }
-
-    @Override
-    public ItemStack getStackInSlot(int index) {
-        return inventory.get(index);
-    }
+    @Override public ItemStack getStackInSlot(int i)  { return inventory.get(i); }
 
     @Override
     public ItemStack decrStackSize(int index, int count) {
@@ -113,160 +93,143 @@ public class TileEntitySuperFurnace extends TileEntityLockable implements ITicka
 
     @Override
     public void setInventorySlotContents(int index, @Nonnull ItemStack stack) {
-        boolean sameItem = !stack.isEmpty() && stack.isItemEqual(inventory.get(index))
-                && ItemStack.areItemStackTagsEqual(stack, inventory.get(index));
+        boolean same = !stack.isEmpty()
+            && stack.isItemEqual(inventory.get(index))
+            && ItemStack.areItemStackTagsEqual(stack, inventory.get(index));
+
         inventory.set(index, stack);
-        if (stack.getCount() > getInventoryStackLimit()) {
+        if (stack.getCount() > getInventoryStackLimit())
             stack.setCount(getInventoryStackLimit());
-        }
-        if (index == SLOT_INPUT && !sameItem) {
-            totalCookTime = getCookTime(stack);
+
+        if (index == SLOT_INPUT && !same) {
+            totalCookTime = COOK_TIME;
             cookTime = 0;
             markDirty();
         }
     }
 
-    @Override
-    public int getInventoryStackLimit() {
-        return 64;
-    }
+    @Override public int     getInventoryStackLimit()                  { return 64; }
+    @Override public void    openInventory(EntityPlayer p)             {}
+    @Override public void    closeInventory(EntityPlayer p)            {}
 
     @Override
     public boolean isUsableByPlayer(EntityPlayer player) {
-        if (world.getTileEntity(pos) != this) return false;
-        return player.getDistanceSq(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64.0;
+        return world.getTileEntity(pos) == this
+            && player.getDistanceSq(pos.getX() + 0.5,
+                                    pos.getY() + 0.5,
+                                    pos.getZ() + 0.5) <= 64.0;
     }
-
-    @Override
-    public void openInventory(EntityPlayer player) {}
-
-    @Override
-    public void closeInventory(EntityPlayer player) {}
 
     @Override
     public boolean isItemValidForSlot(int index, ItemStack stack) {
         if (index == SLOT_OUTPUT) return false;
-        if (index == SLOT_FUEL)   return TileEntityFurnaceHelper.isItemFuel(stack);
+        if (index == SLOT_FUEL)   return TileEntityFurnace.isItemFuel(stack);
         return true;
     }
 
-    @Override
-    public int getField(int id) {
+    // IInventory fields (used by GUI / container sync)
+    @Override public int getField(int id) {
         switch (id) {
-            case 0: return furnaceBurnTime;
+            case 0: return burnTime;
             case 1: return currentItemBurnTime;
             case 2: return cookTime;
             case 3: return totalCookTime;
             default: return 0;
         }
     }
-
-    @Override
-    public void setField(int id, int value) {
+    @Override public void setField(int id, int val) {
         switch (id) {
-            case 0: furnaceBurnTime    = value; break;
-            case 1: currentItemBurnTime = value; break;
-            case 2: cookTime           = value; break;
-            case 3: totalCookTime      = value; break;
+            case 0: burnTime            = val; break;
+            case 1: currentItemBurnTime = val; break;
+            case 2: cookTime            = val; break;
+            case 3: totalCookTime       = val; break;
         }
     }
+    @Override public int getFieldCount() { return 4; }
+    @Override public void clear()        { inventory.clear(); }
 
-    @Override
-    public int getFieldCount() {
-        return 4;
-    }
-
-    @Override
-    public void clear() {
-        inventory.clear();
-    }
-
-    // -------------------------------------------------------------------------
-    // Container / GUI
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // GUI / Container — reuse vanilla furnace container
+    // =========================================================================
 
     @Override
     public Container createContainer(InventoryPlayer playerInventory, EntityPlayer playerIn) {
         return new ContainerFurnace(playerInventory, this);
     }
 
-    @Override
-    public String getGuiID() {
-        return "minecraft:furnace";
-    }
+    @Override public String getGuiID() { return "minecraft:furnace"; }
 
-    // -------------------------------------------------------------------------
-    // NBT serialization
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // NBT
+    // =========================================================================
 
     @Override
-    public void readFromNBT(NBTTagCompound compound) {
-        super.readFromNBT(compound);
+    public void readFromNBT(NBTTagCompound tag) {
+        super.readFromNBT(tag);
         inventory = NonNullList.withSize(getSizeInventory(), ItemStack.EMPTY);
-        ItemStackHelper.loadAllItems(compound, inventory);
-        furnaceBurnTime     = compound.getInteger("BurnTime");
-        cookTime            = compound.getInteger("CookTime");
-        totalCookTime       = compound.getInteger("CookTimeTotal");
-        currentItemBurnTime = getItemBurnTime(inventory.get(SLOT_FUEL));
-        if (compound.hasKey("CustomName", 8)) {
-            customName = compound.getString("CustomName");
-        }
+        ItemStackHelper.loadAllItems(tag, inventory);
+        burnTime            = tag.getInteger("BurnTime");
+        cookTime            = tag.getInteger("CookTime");
+        totalCookTime       = tag.getInteger("CookTimeTotal");
+        currentItemBurnTime = TileEntityFurnace.getItemBurnTime(inventory.get(SLOT_FUEL));
+        if (tag.hasKey("CustomName", 8))
+            customName = tag.getString("CustomName");
     }
 
     @Override
-    public NBTTagCompound writeToNBT(NBTTagCompound compound) {
-        super.writeToNBT(compound);
-        compound.setInteger("BurnTime", furnaceBurnTime);
-        compound.setInteger("CookTime", cookTime);
-        compound.setInteger("CookTimeTotal", totalCookTime);
-        ItemStackHelper.saveAllItems(compound, inventory);
-        if (hasCustomName()) {
-            compound.setString("CustomName", customName);
-        }
-        return compound;
+    public NBTTagCompound writeToNBT(NBTTagCompound tag) {
+        super.writeToNBT(tag);
+        tag.setInteger("BurnTime",      burnTime);
+        tag.setInteger("CookTime",      cookTime);
+        tag.setInteger("CookTimeTotal", totalCookTime);
+        ItemStackHelper.saveAllItems(tag, inventory);
+        if (hasCustomName()) tag.setString("CustomName", customName);
+        return tag;
     }
 
-    // -------------------------------------------------------------------------
-    // Tick logic
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Tick — core smelting logic (3× faster)
+    // =========================================================================
 
     @Override
     public void update() {
         boolean wasBurning = isBurning();
-        boolean dirty = false;
+        boolean dirty      = false;
 
         if (isBurning()) {
-            furnaceBurnTime--;
+            burnTime--;
         }
 
         if (!world.isRemote) {
-            ItemStack fuelStack  = inventory.get(SLOT_FUEL);
-            ItemStack inputStack = inventory.get(SLOT_INPUT);
+            ItemStack fuel  = inventory.get(SLOT_FUEL);
+            ItemStack input = inventory.get(SLOT_INPUT);
 
-            if (isBurning() || (!fuelStack.isEmpty() && !inputStack.isEmpty())) {
+            if (isBurning() || (!fuel.isEmpty() && !input.isEmpty())) {
+                // Need to light / refuel?
                 if (!isBurning() && canSmelt()) {
-                    furnaceBurnTime     = getItemBurnTime(fuelStack);
-                    currentItemBurnTime = furnaceBurnTime;
+                    burnTime            = TileEntityFurnace.getItemBurnTime(fuel);
+                    currentItemBurnTime = burnTime;
 
                     if (isBurning()) {
                         dirty = true;
-                        if (!fuelStack.isEmpty()) {
-                            Item fuelItem = fuelStack.getItem();
-                            fuelStack.shrink(1);
-                            if (fuelStack.isEmpty()) {
-                                ItemStack fuelContainerItem = fuelItem.getContainerItem(fuelStack);
-                                inventory.set(SLOT_FUEL, fuelContainerItem);
+                        if (!fuel.isEmpty()) {
+                            net.minecraft.item.Item fuelItem = fuel.getItem();
+                            fuel.shrink(1);
+                            if (fuel.isEmpty()) {
+                                inventory.set(SLOT_FUEL,
+                                    fuelItem.getContainerItem(fuel));
                             }
                         }
                     }
                 }
 
+                // Cook
                 if (isBurning() && canSmelt()) {
                     cookTime++;
-                    if (cookTime == totalCookTime) {
+                    if (cookTime >= totalCookTime) {
                         cookTime      = 0;
-                        totalCookTime = getCookTime(inputStack);
-                        smeltItem();
+                        totalCookTime = COOK_TIME;
+                        doSmelt();
                         dirty = true;
                     }
                 } else {
@@ -276,28 +239,27 @@ public class TileEntitySuperFurnace extends TileEntityLockable implements ITicka
                 cookTime = MathHelper.clamp(cookTime - 2, 0, totalCookTime);
             }
 
+            // Toggle block state if burn state changed
             if (wasBurning != isBurning()) {
                 dirty = true;
                 BlockSuperFurnace.setState(isBurning(), world, pos);
             }
         }
 
-        if (dirty) {
-            markDirty();
-        }
+        if (dirty) markDirty();
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Helpers
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
-    public boolean isBurning() {
-        return furnaceBurnTime > 0;
-    }
+    public boolean isBurning() { return burnTime > 0; }
 
     private boolean canSmelt() {
         if (inventory.get(SLOT_INPUT).isEmpty()) return false;
-        ItemStack result = FurnaceRecipes.instance().getSmeltingResult(inventory.get(SLOT_INPUT));
+
+        ItemStack result = FurnaceRecipes.instance()
+                                        .getSmeltingResult(inventory.get(SLOT_INPUT));
         if (result.isEmpty()) return false;
 
         ItemStack output = inventory.get(SLOT_OUTPUT);
@@ -305,12 +267,15 @@ public class TileEntitySuperFurnace extends TileEntityLockable implements ITicka
         if (!output.isItemEqual(result)) return false;
 
         int combined = output.getCount() + result.getCount();
-        return combined <= getInventoryStackLimit() && combined <= output.getMaxStackSize();
+        return combined <= getInventoryStackLimit()
+            && combined <= output.getMaxStackSize();
     }
 
-    private void smeltItem() {
+    private void doSmelt() {
         if (!canSmelt()) return;
-        ItemStack result = FurnaceRecipes.instance().getSmeltingResult(inventory.get(SLOT_INPUT));
+
+        ItemStack result = FurnaceRecipes.instance()
+                                        .getSmeltingResult(inventory.get(SLOT_INPUT));
         ItemStack output = inventory.get(SLOT_OUTPUT);
 
         if (output.isEmpty()) {
@@ -322,61 +287,39 @@ public class TileEntitySuperFurnace extends TileEntityLockable implements ITicka
         inventory.get(SLOT_INPUT).shrink(1);
     }
 
-    private int getCookTime(ItemStack stack) {
-        // 3x faster than vanilla (66 ticks instead of 200)
-        return SUPER_COOK_TIME;
-    }
-
-    private int getItemBurnTime(ItemStack stack) {
-        return net.minecraft.tileentity.TileEntityFurnace.getItemBurnTime(stack);
-    }
-
-    /**
-     * Drop all inventory items into the world when the block is broken.
-     */
+    /** Drop all contained items into the world when the block is broken. */
     public void dropInventory(World world, BlockPos pos) {
         for (ItemStack stack : inventory) {
             if (!stack.isEmpty()) {
-                net.minecraft.entity.item.EntityItem entity = new net.minecraft.entity.item.EntityItem(
-                        world,
-                        pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
-                        stack
+                EntityItem drop = new EntityItem(
+                    world,
+                    pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                    stack
                 );
-                entity.motionX = world.rand.nextGaussian() * 0.05;
-                entity.motionY = world.rand.nextGaussian() * 0.05 + 0.2;
-                entity.motionZ = world.rand.nextGaussian() * 0.05;
-                world.spawnEntity(entity);
+                drop.motionX = world.rand.nextGaussian() * 0.05;
+                drop.motionY = world.rand.nextGaussian() * 0.05 + 0.2;
+                drop.motionZ = world.rand.nextGaussian() * 0.05;
+                world.spawnEntity(drop);
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Capability support
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Capabilities
+    // =========================================================================
 
     @Override
-    public boolean hasCapability(@Nonnull Capability<?> capability, @Nullable EnumFacing facing) {
-        if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) return true;
-        return super.hasCapability(capability, facing);
+    public boolean hasCapability(@Nonnull Capability<?> cap, @Nullable EnumFacing side) {
+        return cap == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY
+            || super.hasCapability(cap, side);
     }
 
-    @Override
-    @Nullable
-    public <T> T getCapability(@Nonnull Capability<T> capability, @Nullable EnumFacing facing) {
-        if (capability == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
+    @Override @Nullable
+    public <T> T getCapability(@Nonnull Capability<T> cap, @Nullable EnumFacing side) {
+        if (cap == CapabilityItemHandler.ITEM_HANDLER_CAPABILITY) {
             if (itemHandler == null) itemHandler = new InvWrapper(this);
             return CapabilityItemHandler.ITEM_HANDLER_CAPABILITY.cast(itemHandler);
         }
-        return super.getCapability(capability, facing);
-    }
-
-    // -------------------------------------------------------------------------
-    // Fuel helper
-    // -------------------------------------------------------------------------
-
-    static final class TileEntityFurnaceHelper {
-        static boolean isItemFuel(ItemStack stack) {
-            return net.minecraft.tileentity.TileEntityFurnace.isItemFuel(stack);
-        }
+        return super.getCapability(cap, side);
     }
 }
